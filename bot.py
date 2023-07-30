@@ -1,123 +1,41 @@
-import os,time, requests, json
-from urllib.parse import unquote
-from pySmartDL import SmartDL
-from urllib.error import HTTPError
 from telebot import TeleBot
-from re import findall
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
+import requests
 
 
-BOT_TOKEN = "2014777647:AAENMNc_2cczyclvrK_SBP3pkXoMncE_C8c"
-bot = TeleBot(BOT_TOKEN)
+bot = TeleBot("6023388810:AAG2RumkCxHYhD5r0ktJml-ICp6Ra-GUhCo")
 
 
-login_key = "f13d2b11258ad59462a4" # api login
-key = "MeAg79G4lrUmZJq" # api password
-def db(payload,method="findOne"):
-    url = f"https://ap-south-1.aws.data.mongodb-api.com/app/data-jktzb/endpoint/data/v1/action/{method}"
-    headers = {'Content-Type': 'application/json',
-               'Access-Control-Request-Headers': '*',
-               'api-key': 'oEMu1rIsWSQgMm20dBo9av7uQ1FxIvtNgvR61QwjmcmqEuxAOyIGGl0VwS4QftiA'}
-    return requests.post(url, headers=headers, data=payload).json().get('document')
+def getSize(num, suffix="B"):
+    for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
+        if abs(num) < 1024.0:
+            return f"{num:3.1f}{unit}{suffix}"
+        num /= 1024.0
+    return f"{num:.1f}Yi{suffix}"
 
 
-def gToken():
-    data = json.dumps({"collection": "credentials", "database": "api", "dataSource": "Cluster0", "filter": {}})
-    return db(data).get('gToken')
-
-def auth():
-    g_auth = GoogleAuth()
-    if not os.path.exists("gToken"):
-        credentials = gToken()
-        with open('gToken', 'w') as file:
-            file.write(credentials)
-    g_auth.LoadCredentialsFile('gToken')
-    if g_auth.access_token_expired:
-        g_auth.Refresh()
-        print("refresh")
-    else:
-        g_auth.Authorize()
-        print("auth")
-    return g_auth
-
-def get_ticket(file_id):
-    headers = {'file':file_id,'login':login_key,'key':key}
-    response = requests.get("https://api.strtape.tech/file/dlticket?",headers)
-    data = json.loads(response.text)
-    result = data.get('result')
-    return result
-
-def get_links(data):
-    return findall('https://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', data)[0]
-
-def dl_url(ticket,file_id):
-    headers = {'file':file_id,'ticket':ticket,'login':login_key,'key':key}
-    response = requests.get("https://api.strtape.tech/file/dl?",headers)
-    data = json.loads(response.text)
-    result = data.get('result')
-    if result is not None:
-        link = result.get('url')
-        return link
-    else:
-        return "Not Found"
-def get_file_id(link):
-    lst = []
-    for i in link:
-        lst.append(i)
-
-    lst2 = lst[25:]
-
-    file_id = ""
-    for i in lst2:
-        if i == "/":
-            break;
-        else:
-            file_id += i
-    #print(file_id)
-    return file_id
-
-def get_direct_streamtape(url):
-    file_id = get_file_id(url)
-    result = get_ticket(file_id)
-    ticket = result.get('ticket')
-    time.sleep(result.get('wait_time'))
-    link = dl_url(ticket,file_id)
-    return link
-
-def gUpload(title,file_path):
-    g_auth = auth()
-    drive = GoogleDrive(g_auth)
-    metadata = {
-        'parents': [
-            {"id": "1044vn2oOlwtGaGRz-_UpjA9VMoB5dmTC"}
-        ],
-        'title': title,
-        'mimeType': 'video/x-matroska',
-        'supportsTeamDrives': True, 'includeItemsFromAllDrives': True
-    }
-    file = drive.CreateFile(metadata)
-    file.SetContentFile(file_path)
-    file.Upload()
-    os.remove(file_path)
+remove = "1 2 3 4 5 6 7 8 9 0 1gb 2gb 4gb 5gb 6gb 7gb 8gb 9gb 3gb vish xxx prt mp4 esub info moviesrequest da rips " \
+         "tbpindex cinesandhadi telexmovies blaster originals viewcinemas x264 prolover hq hdtv 720p 1080p 10bit web " \
+         "webrip minx x265 480p nf galaxytv tvseriesbay nsmovies7 " \
+         "2ch psa iboxtv hevc ion265 amzn hs dl aac 0 h 264 aha mkv tvbay t4tvseries ion10 atvp 6ch rarbg mkvcinemas " \
+         "korea aac2 robots ddp5 ntb bluray viewott wdym ysteam brrip imediashare multi hdrip".split(
+    " ")
 
 
-def download_file(url, dl_path):
-  try:
-    dl = SmartDL(url, dl_path, progress_bar=False)
-    dl.start()
-    filename = dl.get_dest()
-    if '+' in filename:
-          xfile = filename.replace('+', ' ')
-          filename2 = unquote(xfile)
-    else:
-        filename2 = unquote(filename)
-    os.rename(filename, filename2)
-    return True, filename2
-  except HTTPError as error:
-    return False, error
+def getTitle(title):
+    title = title.split("\n")[0]
+    title = title.translate(str.maketrans("[]()-+._@—", "          ")).strip().lower().split()
+    title = " ".join([x for x in title if x not in remove])
+    return title.title().strip()
 
 
+def getDetails(message, method="add"):
+    title = message.caption if message.caption else message.document.file_name if message.document else message.video.file_name
+    Id = message.id
+    size = message.document.file_size if message.document else message.video.file_size
+    size = getSize(size)
+    if method == "add":
+        title = getTitle(title)
+    return title + " - " + size, Id
 
 
 @bot.message_handler(commands=['start'])
@@ -125,42 +43,51 @@ def send_welcome(message):
     bot.reply_to(message, "contact @ignore709")
 
 
-@bot.message_handler(content_types=['text'])
-def loader(update):
-    dirs = './downloads/'
-    if 'streamtape.com' in update.text:
-        pass
-    elif 'strtapeadblocker.xyz' in update.text:
-        pass
-    else:
-        return
-    link = get_links(update.text)
-    if '/' in link:
-        links = link.split('/')
-        if len(links) == 6:
-            if link.endswith('mp4'):
-                link = link
-            else:
-                link = link + 'video.mp4'
-        elif len(links) == 5:
-            link = link + '/video.mp4'
-        else:
-            return
-    else:
-        return
-    url = get_direct_streamtape(link)
-    filename = update.text
-    filename = filename[filename.index("n:")+2:filename.index("id:")].strip()
-    result, dl_path = download_file(url, dirs)
-    custom_path = os.path.join(dirs, filename)
-    os.rename(dl_path, custom_path)
-    if result == True:
-        try:
-            gUpload(filename,custom_path)
-            bot.reply_to(update, "completed")
-        except:
-            bot.reply_to(update,"failed")
+@bot.channel_post_handler(content_types=['document', 'video'])
+def add(message):
+    title, Id = getDetails(message)
+    category = None
+    channel = 0
+    if message.chat.id == -1001672758629:
+        channel = 1001672758629
+        category = "movies"
+    elif message.chat.id == -1001885286768:
+        channel = 1001885286768
+        category = "series"
+    elif message.chat.id == -1001805372983:
+        channel = 1001805372983
+        category = "dramas"
+    elif message.chat.id == -1001943439473:
+        channel = 1001943439473
+        category = "anime"
 
+    if category:
+        try:
+            requests.post(f"https://api.moviezdude.site/{category}",
+                          json={"title": title, "Id": Id, "channel": channel})
+        except:
+            pass
+
+
+@bot.edited_channel_post_handler(content_types=['document', 'video'])
+def update(message):
+    title, Id = getDetails(message, "update")
+    category = None
+    if message.chat.id == -1001672758629:
+        category = "movies"
+    elif message.chat.id == -1001885286768:
+        category = "series"
+    elif message.chat.id == -1001805372983:
+        category = "dramas"
+    elif message.chat.id == -1001943439473:
+        category = "anime"
+
+    if category:
+        try:
+            requests.put(f"https://api.moviezdude.site/{category}",
+                         json={"title": title, "Id": Id})
+        except:
+            pass
 
 
 bot.infinity_polling()
