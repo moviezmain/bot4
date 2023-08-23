@@ -2,7 +2,7 @@ from telebot import TeleBot
 import requests
 
 
-bot = TeleBot("6023388810:AAG2RumkCxHYhD5r0ktJml-ICp6Ra-GUhCo")
+bot = TeleBot("")
 
 
 def getSize(num, suffix="B"):
